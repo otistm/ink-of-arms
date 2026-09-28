@@ -110,3 +110,19 @@ st = E.newRun(0, 4); st.tIdx = 2; E.startTable(st);
 ok(!st.table.boss.ruler, 'first citadel has a lord, not a ruler');
 console.log(fails ? fails + ' failures' : 'ruler assertions pass');
 }
+{
+// a saved run picks up exactly where it left off, lords, relics and the random draws included
+const a = E.newRun(1, 42); a.ante = 1; a.tIdx = 2; E.startTable(a);
+a.jokers.push({ id: 'veteran', uid: 9, n: 2 }); E.discard(a, a.table.hand.slice(0, 3).map(c => c.id));
+const b = E.restore(JSON.parse(JSON.stringify(E.snapshot(a))));
+ok(b && b.table.boss === a.table.boss, 'lord restored by id');
+const ids = s => s.table.hand.slice(0, 2).map(c => c.id);
+const ra = E.play(a, ids(a)), rb = E.play(b, ids(b));
+ok(ra.total === rb.total && a.table.hand.map(c => c.id).join() === b.table.hand.map(c => c.id).join(), 'same attack, same result and same draw');
+E.openShop(a); E.openShop(b);
+ok(JSON.stringify(a.shop) === JSON.stringify(b.shop), 'same armory after restore');
+const r9 = E.newRun(2, 7); r9.ante = 2; r9.tIdx = 2; E.startTable(r9);
+ok(E.restore(JSON.parse(JSON.stringify(E.snapshot(r9)))).table.boss.id === 'king', 'ruler restored');
+ok(E.restore({ v: 99 }) === null, 'unknown save ignored');
+console.log(fails ? fails + ' failures' : 'save assertions pass');
+}

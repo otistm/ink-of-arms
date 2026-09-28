@@ -57,6 +57,7 @@ function renderButtons() {
   $('playBtn').disabled = busy || !E.canPlay(st, ids);
   $('discardBtn').disabled = busy || t.discards <= 0 || !ids.length;
   $('sortBtn').disabled = busy;
+  $('pause').disabled = busy;
 }
 function renderPreview() {
   const cards = st.table.hand.filter(c => sel.has(c.id));
@@ -161,11 +162,13 @@ $('discardBtn').onclick = async () => {
   const els = [...$('hand').children].filter(el => sel.has(+el.dataset.id));
   await flyOut(els, 'right');
   const drawn = E.discard(st, ids);
+  saveRun('siege');
   sel.clear(); busy = false;
   renderHud(); renderHand(new Set(drawn.map(c => c.id))); renderPreview(); renderButtons();
 };
 
 $('stage').onclick = () => { if (busy) speed = 0.3; };
+$('pause').onclick = e => { e.stopPropagation(); showPause(); };
 
 $('playBtn').onclick = async () => {
   const ids = [...sel];
@@ -184,6 +187,7 @@ $('playBtn').onclick = async () => {
     anim(el, [{ transform: 'translateY(120px) scale(.8) rotate(6deg)', opacity: 0 }, { transform: 'translateY(-8px) scale(1.04)', opacity: 1, offset: .7 }, { transform: 'none', opacity: 1 }], 380 + i * 40);
   });
   const res = E.play(st, order);
+  if (res.lost) clearRun(); else saveRun(res.cleared ? 'breached' : 'siege');
   sel.clear();
   await sleep(420);
   const scoringIds = new Set(res.ev.scoring.map(c => c.id));

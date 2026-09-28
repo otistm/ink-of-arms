@@ -44,7 +44,8 @@ Otis is the designer. He doesn't read code. He judges changes by playing them on
 ## Protect players' saved progress
 Progress is kept in the browser's localStorage under `inkofarms-save`: `{ trophies: [bool, bool, bool] }`.
 - Never rename that key or remove a field. Add new fields with defaults.
-- Never rename a relic `id`, house key or attack `key`; future saves may store them.
+- Never rename a relic `id`, house key or attack `key`, or a lord or ruler `id`; saved runs store them.
+- The run in progress (pause and resume, copied from Ink Nine) is saved under `inkofarms-run` by `saveRun` in screens.js, using `Engine.snapshot` / `Engine.restore`. The snapshot has `v:1`; if you change the shape of the run, bump `v` and make `restore()` ignore or convert older snapshots.
 
 ## Look and feel (same as Ink Nine and Ink Rally; keep it consistent)
 - Paper and ink only: white `#fff` and black `#000`, with grey `#5c5c5c` only for secondary text. Never color. Things are told apart by ink: solid versus outline, filled versus hollow, dashed for locked or sold.
@@ -63,5 +64,6 @@ Progress is kept in the browser's localStorage under `inkofarms-save`: `{ trophi
 - Discard throws the picked cards away and deals new ones.
 - Winning a siege shows "Walls breached" with the payout board; Collect opens the armory. Buying a relic adds it to the row; tapping a relic lets you move or sell it.
 - A citadel shows its lord's rule in a dashed box, and blotted cards show an ink blot.
+- The pause button opens "Paused"; Save and go to the home screen shows "Saved during siege…" on the campaign card, and tapping it picks up the same hand. Refreshing mid-siege or in the armory comes straight back.
 - Losing shows "The siege failed" with Try again. Taking all nine sieges shows the trophy, and it's still on the home screen after a refresh.
 - No errors in the browser console.

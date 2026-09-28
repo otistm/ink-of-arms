@@ -105,6 +105,17 @@ button{ appearance:none; font:inherit; color:inherit; background:none; border:0;
 .joker .rar{ position:absolute; top:5px; right:5px; display:flex; gap:2px; }
 .rar i{ width:6px; height:6px; border-radius:50%; background:var(--ink); }
 
+/* The pause button, copied from Ink Nine. Here it sits in the top corner of the stage. */
+#pause{position:absolute;right:2px;top:0;z-index:6;width:44px;height:44px;border-radius:50%;
+  border:2.5px solid var(--ink);background:var(--paper);color:var(--ink);box-shadow:3px 4px 0 var(--ink);display:grid;place-items:center;cursor:pointer;padding:0;
+  transition:transform .28s cubic-bezier(.34,1.56,.64,1),opacity .2s}
+#pause svg{width:26px;height:26px}
+#pause:active{transform:scale(1.12,.86)}
+#pause:disabled{opacity:.3;cursor:default}
+#pause:focus-visible{outline:3px solid var(--ink);outline-offset:4px}
+.evn{font-size:12px !important;font-weight:800 !important;color:var(--ink) !important;margin:0 0 4px !important}
+.resnote{font-size:12px;font-weight:600;color:var(--soft);margin:-4px 0 10px;line-height:1.4}
+.ev .saved strong{font-weight:800}
 .stage{ position:relative; flex:1; min-height:140px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; }
 .played{ display:flex; gap:8px; justify-content:center; min-height:calc(var(--cw) * 1.4); }
 .readout{ display:flex; flex-direction:column; align-items:center; gap:8px; }

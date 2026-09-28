@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.3.0
+- New pause button in the corner above your hand, the same as Ink Nine's. It opens a card to keep playing, or save and go to the home screen.
+- Your march is saved as you play. Your campaign's card on the home screen shows where you stopped; tap it to carry on, or start that campaign over.
+- Refreshing or closing the page brings you back where you were, even in the armory.
+
 ## 0.2.0
 - Each campaign is now a war on a ruler: Baron Vorn, then Duke Morcant, then King Aldous. The home screen says who you're marching on.
 - Each castle has a name, and a line of story opens every siege. The lords at the first two citadels serve the ruler.

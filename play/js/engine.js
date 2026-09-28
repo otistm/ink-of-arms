@@ -31,6 +31,14 @@ const Engine = (() => {
       return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
     };
   }
+  // A random stream that counts its draws, so a saved run can pick up exactly where it left off.
+  function seeded(seed, n = 0) {
+    const g = mulberry(seed);
+    for (let i = 0; i < n; i++) g();
+    const r = () => { r.n++; return g(); };
+    r.n = n;
+    return r;
+  }
   function shuffle(arr, rnd) {
     for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(rnd() * (i + 1));
@@ -176,7 +184,7 @@ const Engine = (() => {
   }
 
   function newRun(inv, seed) {
-    const rnd = mulberry(seed);
+    const rnd = seeded(seed);
     const levels = Object.fromEntries(HANDS.map(h => [h.key, 1]));
     const bosses = shuffle(BOSSES.slice(), rnd).slice(0, 3);
     return {
@@ -414,10 +422,29 @@ const Engine = (() => {
     return true;
   }
 
+  // ---------- Saving a run in progress ----------
+  // A plain copy of the run that fits in localStorage. Lords and rulers are stored by id.
+  // If the shape changes, bump v and make restore() ignore or convert older snapshots.
+  function snapshot(st) {
+    const { rnd, bosses, table, ...rest } = st;
+    return { v: 1, ...JSON.parse(JSON.stringify(rest)), rn: rnd.n, bosses: bosses.map(b => b.id),
+      table: table && JSON.parse(JSON.stringify({ ...table, boss: table.boss ? table.boss.id : null })) };
+  }
+  function restore(s) {
+    if (!s || s.v !== 1 || !INVITATIONALS[s.inv]) return null;
+    const byId = id => BOSSES.find(b => b.id === id) || RULERS.find(b => b.id === id);
+    const { v, rn, bosses, table, phase, at, ...rest } = s;
+    const st = { ...rest, rnd: seeded(s.seed, rn), bosses: bosses.map(byId) };
+    st.table = table && { ...table, boss: table.boss ? byId(table.boss) : null };
+    if (st.bosses.some(b => !b) || (table && table.boss && !st.table.boss)) return null;
+    if (st.jokers.some(j => !JOKER[j.id])) return null;
+    return st;
+  }
+
   return {
     SUITS, RED, SUIT_ORDER, HOUSE, titleOf, HANDS, HAND, JOKERS, JOKER, BOSSES, RULERS, INVITATIONALS,
     rankLabel, cardChips, isFace, handBase, evaluate, newRun, tableInfo, startTable,
-    canPlay, guarded, spent, play, discard, cashout, advance, openShop, reroll, buy, sell, sellValue, moveJoker, isBlotted, mulberry,
+    canPlay, guarded, spent, play, discard, cashout, advance, openShop, reroll, buy, sell, sellValue, moveJoker, isBlotted, mulberry, snapshot, restore,
   };
 })();
 if (typeof module !== 'undefined') module.exports = Engine; // lets tools/check.js load the rules in Node

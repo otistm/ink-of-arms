@@ -6,6 +6,7 @@
 function renderTitle() {
   const invs = $('invs');
   invs.innerHTML = '';
+  const RUN = loadRun();
   E.INVITATIONALS.forEach((inv, i) => {
     const locked = i > 0 && !save.trophies[i - 1];
     // only the next locked campaign is shown; the ones after it stay a surprise
@@ -15,13 +16,21 @@ function renderTitle() {
     b.className = 'event' + (locked ? ' locked' : '');
     b.style.animationDelay = (i * 0.08) + 's';
     const kicker = `March on ${inv.ruler}`;
+    const saved = RUN && RUN.inv === i;
     const line = locked ? `Win ${E.INVITATIONALS[i - 1].name} to march on ${inv.ruler}.`
+      : saved ? savedLine(RUN)
       : won ? inv.end
       : `Take ${inv.castles[0]}, ${inv.castles[1]} and ${inv.castles[2]}, then bring down ${inv.foe}.`;
-    b.innerHTML = `<div class="tw-wrap">${locked ? LOCK : TROPHY(won)}<small>${locked ? 'Locked' : won ? 'Won' : 'Trophy'}</small></div><div class="ev"><i>${kicker}</i><b>${inv.name}</b><span>${line}</span></div>`;
-    b.onclick = () => { if (locked) { b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope'); return; } startRun(i); };
+    b.innerHTML = `<div class="tw-wrap">${locked ? LOCK : TROPHY(won)}<small>${locked ? 'Locked' : won ? 'Won' : 'Trophy'}</small></div><div class="ev"><i>${kicker}</i><b>${inv.name}</b><span${saved ? ' class="saved"' : ''}>${line}</span></div>`;
+    b.onclick = () => {
+      if (locked) { b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope'); return; }
+      if (saved && resumeRun(RUN)) return;
+      startRun(i);
+    };
     invs.appendChild(b);
   });
+  $('resnote').innerHTML = RUN ? `<p class="resnote"><button class="linkbtn" id="restartBtn">Start ${E.INVITATIONALS[RUN.inv].name} over</button>. Starting another campaign also replaces your saved march.</p>` : '';
+  if (RUN) $('restartBtn').onclick = () => startRun(RUN.inv);
   show('title');
 }
 $('howBtn').onclick = () => sheet(`<h2>How to play</h2><p>Draw cards. Take castles. Get trophies.</p>
@@ -32,6 +41,47 @@ $('howBtn').onclick = () => sheet(`<h2>How to play</h2><p>Draw cards. Take castl
   <p>Between sieges, buy relics and tactics in the armory.</p>
   <p>Each campaign is a war on a ruler. Take three castles, beat the lords who hold them, then face the ruler in the last citadel. Lords and rulers change the rules.</p></div>
   <button class="btn" onclick="document.getElementById('veil').classList.remove('on')">Got it</button>`);
+
+// ---------- pause, save and resume (the same as Ink Nine) ----------
+// The run in progress lives in localStorage, so a refresh or a pause picks up where you were.
+// It is saved at every safe moment: each siege intro, after every attack and discard, and in the armory.
+const RUN_KEY = 'inkofarms-run';
+function saveRun(phase) {
+  if (!st || st.over) return;
+  try { localStorage.setItem(RUN_KEY, JSON.stringify({ ...E.snapshot(st), phase, at: Date.now() })); } catch (e) {}
+}
+function clearRun() { try { localStorage.removeItem(RUN_KEY); } catch (e) {} }
+function loadRun() { try { const r = JSON.parse(localStorage.getItem(RUN_KEY) || 'null'); return r && E.restore(r) ? r : null; } catch (e) { return null; } }
+function resumeRun(r) {
+  try {
+    st = E.restore(r); sel.clear(); busy = false; closeSheet();
+    if (r.phase === 'shop') { renderShop(); show('shop'); return true; }
+    if (r.phase === 'siege' || r.phase === 'breached') {
+      sizeCards(); show('game'); renderGame(true);
+      if (r.phase === 'breached') cashoutSheet();
+      return true;
+    }
+    showIntro();
+    return true;
+  } catch (e) { console.warn('Could not resume', e); clearRun(); st = null; return false; }
+}
+function savedLine(r) {
+  const n = r.ante * 3 + r.tIdx + 1, castle = E.INVITATIONALS[r.inv].castles[r.ante];
+  const where = r.phase === 'shop' ? `Saved in the armory, before siege ${n} of 9.`
+    : r.phase === 'intro' ? `Saved before siege ${n} of 9, ${castle}.`
+    : `Saved during siege ${n} of 9, ${castle}.`;
+  return `<strong>${where}</strong> $${r.money}, ${r.jokers.length} relic${r.jokers.length === 1 ? '' : 's'}. Tap to continue.`;
+}
+function showPause() {
+  if (busy || !st || !st.table) return;
+  const t = st.table, inv = E.INVITATIONALS[st.inv];
+  saveRun('siege');
+  sheet(`<p class="evn">${inv.name}, ${t.castle}</p><h2>Paused</h2>
+    <p>Siege ${t.number} of 9, ${t.boss ? t.boss.name : t.kind.toLowerCase()}. ${t.hands} attack${t.hands === 1 ? '' : 's'} left. Your march is saved. Pick it up from the home screen whenever you like.</p>
+    <button class="btn" id="resume">Keep playing</button><button class="btn ghost" id="toHome">Save and go to the home screen</button>`);
+  $('resume').onclick = closeSheet;
+  $('toHome').onclick = () => { closeSheet(); renderTitle(); };
+}
 
 function startRun(inv) {
   st = E.newRun(inv, (Date.now() ^ Math.floor(Math.random() * 1e9)) >>> 0);
@@ -58,11 +108,13 @@ function showIntro() {
   $('introBoss').textContent = info.boss ? info.boss.desc : '';
   $('introBoss').classList.toggle('hidden', !info.boss);
   $('introReward').textContent = `Take it for $${info.reward}, plus $1 for each attack you don't use.`;
+  saveRun('intro');
   show('intro');
   const p = $('introPanel'); p.style.animation = 'none'; void p.offsetHeight; p.style.animation = '';
 }
 $('sitBtn').onclick = () => {
   E.startTable(st);
+  saveRun('siege');
   sel.clear();
   sizeCards();
   show('game');
@@ -90,7 +142,7 @@ function jokerSheet(j, allowSell) {
     <div class="twobtn"><button class="btn ghost" id="jl" ${i <= 0 ? 'disabled' : ''}>Move left</button><button class="btn ghost" id="jr" ${i >= st.jokers.length - 1 ? 'disabled' : ''}>Move right</button></div>
     ${allowSell ? `<button class="btn ghost" id="js" style="margin-top:8px">Sell for $${E.sellValue(j)}</button>` : ''}
     <button class="btn" id="jc" style="margin-top:8px">Done</button>`);
-  const refresh = () => { if ($('shop').classList.contains('on')) renderShop(); else renderGame(); };
+  const refresh = () => { const shop = $('shop').classList.contains('on'); if (shop) renderShop(); else renderGame(); saveRun(shop ? 'shop' : 'siege'); };
   $('jl').onclick = () => { E.moveJoker(st, j.uid, -1); refresh(); jokerSheet(j, allowSell); };
   $('jr').onclick = () => { E.moveJoker(st, j.uid, 1); refresh(); jokerSheet(j, allowSell); };
   if (allowSell) $('js').onclick = () => { E.sell(st, j.uid); closeSheet(); refresh(); };
@@ -129,6 +181,7 @@ function cashoutSheet() {
     const next = E.advance(st);
     if (next === 'won') return wonSheet();
     E.openShop(st);
+    saveRun('shop');
     renderShop();
     show('shop');
   };
@@ -136,6 +189,7 @@ function cashoutSheet() {
 function lostSheet() {
   const t = st.table;
   const inv = st.inv;
+  clearRun();
   const held = t.boss ? `${t.boss.name} holds ${t.castle}.` : `${t.castle}'s ${t.kind.slice(4)} holds.`;
   sheet(`<h2>The siege failed</h2><p>${held} Out of attacks at siege ${t.number}.</p>
     <div class="big">${fmt(t.score)}</div><p style="margin-top:0">of the ${fmt(t.target)} needed to breach</p>
@@ -149,6 +203,7 @@ function lostSheet() {
 }
 function wonSheet() {
   save.trophies[st.inv] = true; writeSave(save);
+  clearRun();
   const inv = E.INVITATIONALS[st.inv];
   sheet(`<h2>Trophy won</h2><p>${inv.end}</p>
     <div class="award"><div class="troph" id="troph">${TROPHY(true)}</div><p>${capital(inv.foe)} has fallen</p></div>
@@ -188,6 +243,7 @@ function renderShop(flashIdx) {
     btn.onclick = () => {
       if (it.sold) return;
       if (E.buy(st, i)) {
+        saveRun('shop');
         renderShop(i);
         squash($('shopMoney'));
         const slots = $('shopJokers').querySelectorAll('.joker');
@@ -201,6 +257,6 @@ function renderShop(flashIdx) {
   $('rerollBtn').innerHTML = `Restock<small>$${st.shop.reroll}</small>`;
   $('rerollBtn').disabled = st.money < st.shop.reroll;
 }
-$('rerollBtn').onclick = () => { if (E.reroll(st)) { renderShop(); squash($('shopMoney')); } };
+$('rerollBtn').onclick = () => { if (E.reroll(st)) { saveRun('shop'); renderShop(); squash($('shopMoney')); } };
 $('nextBtn').onclick = () => showIntro();
 
