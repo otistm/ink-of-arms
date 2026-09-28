@@ -75,7 +75,7 @@ for (const inv of [0,1,2]) for (let s = 1; s <= runs; s++) {
   if (st.won) wins[inv]++;
   deepest.push(st.stats.tablesCleared);
 }
-console.log('bot wins per invitational out of', runs, wins, 'avg tables', (deepest.reduce((a,b)=>a+b,0)/deepest.length).toFixed(1));
+console.log('bot wins per campaign out of', runs, wins, 'avg sieges taken', (deepest.reduce((a,b)=>a+b,0)/deepest.length).toFixed(1));
 console.log(fails ? fails + ' failures' : 'all assertions pass');
 {
 const st = E.newRun(0, 5); E.startTable(st);

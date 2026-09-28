@@ -1,5 +1,8 @@
 # Changelog
 
+## 0.1.1
+- The balance test now talks about campaigns and sieges instead of words left over from another game. Nothing changes in play.
+
 ## 0.1.0
 - First version on GitHub, moved over from the Claude prototype. Same game, split into files the way Ink Nine and Ink Rally are.
 - A front page with a hand of ink cards fanning open behind the Play button.
