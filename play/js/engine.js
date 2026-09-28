@@ -1,0 +1,372 @@
+/* =====================================================================
+   The rules. No drawing here, so it can be tested on its own (node tools/check.js).
+   Houses, titles, attacks (poker hands), relics, lords (bosses), campaigns, scoring, the armory.
+   Never rename a relic id: they will be saved in players' runs once runs are saved.
+   ===================================================================== */
+"use strict";
+const Engine = (() => {
+  const SUITS = ['S', 'H', 'C', 'D'];
+  const RED = { H: 1, D: 1 };
+  const SUIT_ORDER = { S: 0, H: 1, C: 2, D: 3 };
+  // Houses: S Knights, C Archers, D Mages, H Clerics. Ranks 2..14 are titles I..XIII.
+  const HOUSE = {
+    S: { name: 'Knights', one: 'Knight', ability: 'Stalwart', text: 'Each Knight you hold back in your hand gives +2 mult when you attack' },
+    C: { name: 'Archers', one: 'Archer', ability: 'Volley', text: 'When scored, gives +6 chips for each other Archer in the attack' },
+    D: { name: 'Mages', one: 'Mage', ability: 'Arcane', text: 'When scored, gives ×1.2 mult' },
+    H: { name: 'Clerics', one: 'Cleric', ability: 'Blessing', text: 'When scored, restores one discard, once per attack' },
+  };
+  const TITLES = ['', '', 'Peasant', 'Page', 'Squire', 'Yeoman', 'Sergeant', 'Captain', 'Marshal', 'Baron', 'Earl', 'Duke', 'Prince', 'Queen', 'King'];
+  const ROMAN = ['', '', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI', 'XII', 'XIII'];
+  const rankLabel = r => ROMAN[r];
+  const titleOf = r => TITLES[r];
+  const cardChips = r => (r === 14 ? 11 : r >= 11 ? 10 : r);
+  const isFace = c => c.r >= 12;
+
+  function mulberry(seed) {
+    let a = seed >>> 0;
+    return () => {
+      a |= 0; a = (a + 0x6d2b79f5) | 0;
+      let t = Math.imul(a ^ (a >>> 15), 1 | a);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function shuffle(arr, rnd) {
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(rnd() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+  function makeDeck() {
+    const d = []; let id = 0;
+    for (const s of SUITS) for (let r = 2; r <= 14; r++) d.push({ id: id++, s, r });
+    return d;
+  }
+
+  const HANDS = [
+    { key: 'hc', name: 'Lone Rider', c: 5, m: 1, lc: 10, lm: 1 },
+    { key: 'pair', name: 'Duel', c: 10, m: 2, lc: 15, lm: 1 },
+    { key: '2pair', name: 'Double Duel', c: 20, m: 2, lc: 20, lm: 1 },
+    { key: 'three', name: 'Council', c: 30, m: 3, lc: 20, lm: 2 },
+    { key: 'straight', name: 'Chain of Command', c: 30, m: 4, lc: 30, lm: 3 },
+    { key: 'flush', name: 'Banner', c: 35, m: 4, lc: 15, lm: 2 },
+    { key: 'full', name: 'Garrison', c: 40, m: 4, lc: 25, lm: 2 },
+    { key: 'four', name: 'Warband', c: 60, m: 7, lc: 30, lm: 3 },
+    { key: 'sf', name: 'Crusade', c: 100, m: 8, lc: 40, lm: 4 },
+  ];
+  const HAND = Object.fromEntries(HANDS.map(h => [h.key, h]));
+  const handBase = (key, lv) => {
+    const h = HAND[key];
+    return { chips: h.c + h.lc * (lv - 1), mult: h.m + h.lm * (lv - 1) };
+  };
+
+  function evaluate(cards) {
+    if (!cards.length) return null;
+    const byRank = {};
+    cards.forEach(c => (byRank[c.r] = byRank[c.r] || []).push(c));
+    const groups = Object.values(byRank).sort((a, b) => b.length - a.length || b[0].r - a[0].r);
+    let flush = false, straight = false;
+    if (cards.length === 5) {
+      flush = cards.every(c => c.s === cards[0].s);
+      const rs = [...new Set(cards.map(c => c.r))].sort((a, b) => a - b);
+      if (rs.length === 5 && rs[4] - rs[0] === 4) straight = true;
+    }
+    const g0 = groups[0].length, g1 = groups[1] ? groups[1].length : 0;
+    let key, scoring;
+    if (straight && flush) { key = 'sf'; scoring = cards; }
+    else if (g0 === 4) { key = 'four'; scoring = groups[0]; }
+    else if (g0 === 3 && g1 === 2) { key = 'full'; scoring = cards; }
+    else if (flush) { key = 'flush'; scoring = cards; }
+    else if (straight) { key = 'straight'; scoring = cards; }
+    else if (g0 === 3) { key = 'three'; scoring = groups[0]; }
+    else if (g0 === 2 && g1 === 2) { key = '2pair'; scoring = [...groups[0], ...groups[1]]; }
+    else if (g0 === 2) { key = 'pair'; scoring = groups[0]; }
+    else { key = 'hc'; scoring = [cards.reduce((a, b) => (b.r > a.r ? b : a))]; }
+    const set = new Set(scoring);
+    return {
+      key, scoring: cards.filter(c => set.has(c)),
+      has: { pair: g0 >= 2, twopair: g0 >= 2 && g1 >= 2, three: g0 >= 3, four: g0 >= 4, straight, flush },
+    };
+  }
+
+  // ---------- Jokers ----------
+  const JOKERS = [
+    { id: 'whetstone', name: 'Whetstone', rarity: 1, cost: 4, desc: '+4 mult', onHand: () => ({ mult: 4 }) },
+    { id: 'holyseal', name: 'Holy Seal', rarity: 1, cost: 5, desc: 'Scored Clerics and Mages give +3 mult', onCard: c => (RED[c.s] ? { mult: 3 } : null) },
+    { id: 'ironco', name: 'Iron Company', rarity: 1, cost: 5, desc: 'Scored Knights and Archers give +25 chips', onCard: c => (!RED[c.s] ? { chips: 25 } : null) },
+    { id: 'glove', name: 'Dueling Glove', rarity: 1, cost: 4, desc: '+8 mult if the attack contains a Duel', onHand: x => (x.ev.has.pair ? { mult: 8 } : null) },
+    { id: 'horn', name: 'War Horn', rarity: 1, cost: 5, desc: '+12 mult if the attack is a Chain of Command', onHand: x => (x.ev.has.straight ? { mult: 12 } : null) },
+    { id: 'arms', name: 'Coat of Arms', rarity: 1, cost: 5, desc: 'Scored royals give +30 chips', onCard: c => (isFace(c) ? { chips: 30 } : null) },
+    { id: 'drum', name: 'Drum', rarity: 1, cost: 4, desc: 'Scored cards with even titles, II to XII, give +4 mult', onCard: c => ((c.r - 1) % 2 === 0 ? { mult: 4 } : null) },
+    { id: 'fife', name: 'Fife', rarity: 1, cost: 4, desc: 'Scored cards with odd titles, I to XIII, give +25 chips', onCard: c => ((c.r - 1) % 2 === 1 ? { chips: 25 } : null) },
+    { id: 'reserves', name: 'Reserves', rarity: 1, cost: 4, desc: '+20 chips for each discard you have left', onHand: x => (x.discards > 0 ? { chips: 20 * x.discards } : null) },
+    { id: 'jewel', name: 'Crown Jewel', rarity: 1, cost: 5, desc: 'Scored Kings give +20 chips and +4 mult', onCard: c => (c.r === 14 ? { chips: 20, mult: 4 } : null) },
+    { id: 'skirmisher', name: 'Skirmisher', rarity: 1, cost: 4, desc: '+20 mult if you attack with 3 or fewer cards', onHand: x => (x.played.length <= 3 ? { mult: 20 } : null) },
+    { id: 'tithe', name: 'Tithe Box', rarity: 1, cost: 5, desc: 'Earn $3 after each siege you win', endTable: () => 3 },
+    { id: 'bearer', name: 'Standard Bearer', rarity: 1, cost: 5, desc: 'Knights held in hand give +4 mult instead of +2' },
+    { id: 'longbow', name: 'Longbow', rarity: 1, cost: 5, desc: 'Archer volleys give +12 chips per Archer instead of +6' },
+    { id: 'roundtable', name: 'Round Table', rarity: 2, cost: 7, desc: '×3 mult if the attack contains a Council', onHand: x => (x.ev.has.three ? { xmult: 3 } : null) },
+    { id: 'heraldry', name: 'Heraldry', rarity: 2, cost: 6, desc: '×2 mult if the attack is a Banner', onHand: x => (x.ev.has.flush ? { xmult: 2 } : null) },
+    { id: 'laststand', name: 'Last Stand', rarity: 2, cost: 6, desc: '×3 mult on your final attack of a siege', onHand: x => (x.isLast ? { xmult: 3 } : null) },
+    { id: 'treasury', name: 'Treasury', rarity: 2, cost: 6, desc: '+1 mult for every $3 you hold', onHand: x => (x.money >= 3 ? { mult: Math.floor(x.money / 3) } : null) },
+    { id: 'veteran', name: 'Veteran', rarity: 2, cost: 6, desc: 'Gains +1 mult every attack you make', live: j => `Now +${j.n || 0} mult`, onHand: (x, j) => { j.n = (j.n || 0) + 1; return { mult: j.n }; } },
+    { id: 'throne', name: 'Throne', rarity: 2, cost: 7, desc: 'Scored Queens and Kings give ×1.5 mult', onCard: c => (c.r === 13 || c.r === 14 ? { xmult: 1.5 } : null) },
+    { id: 'blotter', name: 'Blotter', rarity: 2, cost: 5, desc: 'Blotted cards give +8 mult instead of nothing', onBlot: () => ({ mult: 8 }) },
+    { id: 'grimoire', name: 'Grimoire', rarity: 2, cost: 7, desc: 'Arcane gives ×1.4 mult instead of ×1.2' },
+    { id: 'reliquary', name: 'Reliquary', rarity: 2, cost: 6, desc: 'Every scored Cleric restores a discard, not just the first' },
+    { id: 'emptyhall', name: 'Empty Hall', rarity: 3, cost: 8, desc: '×1 mult for each empty relic slot, plus this one', onHand: x => ({ xmult: 1 + x.emptySlots }) },
+    { id: 'royalseal', name: 'Royal Seal', rarity: 3, cost: 8, desc: '×2 mult if all five cards in the attack score', onHand: x => (x.ev.scoring.length === 5 ? { xmult: 2 } : null) },
+  ];
+  const JOKER = Object.fromEntries(JOKERS.map(j => [j.id, j]));
+
+  // ---------- Bosses ----------
+  const BOSSES = [
+    { id: 'heretic', name: 'The Heretic', desc: 'Every Cleric is blotted and scores nothing.', blot: c => c.s === 'H' },
+    { id: 'downpour', name: 'The Downpour', desc: 'Wet bowstrings. Every Archer is blotted.', blot: c => c.s === 'C' },
+    { id: 'hexer', name: 'The Hexer', desc: 'Every Mage is blotted and scores nothing.', blot: c => c.s === 'D' },
+    { id: 'rust', name: 'The Rust Lord', desc: 'Every Knight is blotted, even held back.', blot: c => c.s === 'S' },
+    { id: 'usurper', name: 'The Usurper', desc: 'Princes, Queens and Kings are blotted.', blot: isFace },
+    { id: 'duelist', name: 'The Duelist', desc: 'You get one attack. The walls are half as strong.', hands: 1, targetMul: 0.5 },
+    { id: 'drill', name: 'The Drillmaster', desc: 'Every attack must be exactly five cards.', mustFive: true },
+    { id: 'plague', name: 'The Plague', desc: 'You hold one fewer card.', handSize: -1 },
+    { id: 'warden', name: 'The Warden', desc: 'No discards, and Clerics cannot restore any.', discards: 0, noBless: true },
+  ];
+
+  const INVITATIONALS = [
+    { name: 'Campaign I', mul: 1.3 },
+    { name: 'Campaign II', mul: 2.1 },
+    { name: 'Campaign III', mul: 3.3 },
+  ];
+  const ANTE_BASE = [300, 800, 2000];
+  const TABLE_KIND = ['The outpost', 'The keep', 'The citadel'];
+  const TABLE_MUL = [1, 1.5, 2];
+  const TABLE_REWARD = [3, 4, 5];
+
+  function niceRound(n) {
+    const step = n >= 2000 ? 50 : 10;
+    return Math.round(n / step) * step;
+  }
+
+  function newRun(inv, seed) {
+    const rnd = mulberry(seed);
+    const levels = Object.fromEntries(HANDS.map(h => [h.key, 1]));
+    const bosses = shuffle(BOSSES.slice(), rnd).slice(0, 3);
+    return {
+      inv, seed, rnd, ante: 0, tIdx: 0, money: 4, jokers: [], maxJokers: 5, levels,
+      handsMax: 4, discardsMax: 3, handSize: 8, bosses, uid: 1, table: null, shop: null,
+      stats: { handsPlayed: 0, best: 0, bestHand: null, tablesCleared: 0 }, over: false, won: false,
+    };
+  }
+
+  function tableInfo(st) {
+    const boss = st.tIdx === 2 ? st.bosses[st.ante] : null;
+    let target = ANTE_BASE[st.ante] * TABLE_MUL[st.tIdx] * INVITATIONALS[st.inv].mul;
+    if (boss && boss.targetMul) target *= boss.targetMul;
+    return {
+      kind: TABLE_KIND[st.tIdx], boss, target: niceRound(target), reward: TABLE_REWARD[st.tIdx],
+      number: st.ante * 3 + st.tIdx + 1,
+    };
+  }
+
+  function startTable(st) {
+    const info = tableInfo(st);
+    const b = info.boss || {};
+    st.table = {
+      ...info, score: 0,
+      hands: b.hands != null ? b.hands : st.handsMax,
+      discards: b.discards != null ? b.discards : st.discardsMax,
+      handSize: st.handSize + (b.handSize || 0),
+      draw: shuffle(makeDeck(), st.rnd), hand: [],
+    };
+    drawUp(st);
+    return st.table;
+  }
+
+  function drawUp(st) {
+    const t = st.table;
+    const drawn = [];
+    while (t.hand.length < t.handSize && t.draw.length) { const c = t.draw.pop(); t.hand.push(c); drawn.push(c); }
+    return drawn;
+  }
+
+  function isBlotted(st, c) {
+    const b = st.table && st.table.boss;
+    return !!(b && b.blot && b.blot(c));
+  }
+
+  function canPlay(st, ids) {
+    const t = st.table;
+    if (!t || t.hands <= 0 || !ids.length || ids.length > 5) return false;
+    if (t.boss && t.boss.mustFive && ids.length !== 5) return false;
+    return true;
+  }
+
+  function scoreHand(st, played) {
+    const t = st.table;
+    const ev = evaluate(played);
+    const lv = st.levels[ev.key];
+    let { chips, mult } = handBase(ev.key, lv);
+    const steps = [{ t: 'base', key: ev.key, name: HAND[ev.key].name, lv, chips, mult }];
+    const x = {
+      ev, played, isLast: t.hands === 1, discards: t.discards, money: st.money,
+      emptySlots: st.maxJokers - st.jokers.length,
+    };
+    const has = id => st.jokers.some(j => j.id === id);
+    let blessed = 0;
+    const apply = (e, base) => {
+      if (e.chips) chips += e.chips;
+      if (e.mult) mult += e.mult;
+      if (e.xmult) mult *= e.xmult;
+      mult = Math.round(mult * 100) / 100;
+      steps.push({ ...base, ...e, chipsNow: chips, multNow: mult });
+    };
+    for (const c of ev.scoring) {
+      if (isBlotted(st, c)) {
+        steps.push({ t: 'blot', card: c.id, chipsNow: chips, multNow: mult });
+        for (const j of st.jokers) {
+          const d = JOKER[j.id];
+          if (d.onBlot) apply(d.onBlot(c, x, j), { t: 'joker', joker: j.uid, card: c.id });
+        }
+        continue;
+      }
+      apply({ chips: cardChips(c.r) }, { t: 'card', card: c.id });
+      if (c.s === 'C') {
+        const others = played.filter(o => o !== c && o.s === 'C').length;
+        if (others) apply({ chips: others * (has('longbow') ? 12 : 6) }, { t: 'house', card: c.id, house: 'C' });
+      } else if (c.s === 'D') {
+        apply({ xmult: has('grimoire') ? 1.4 : 1.2 }, { t: 'house', card: c.id, house: 'D' });
+      } else if (c.s === 'H' && !(t.boss && t.boss.noBless) && (blessed === 0 || has('reliquary'))) {
+        blessed++;
+        steps.push({ t: 'house', card: c.id, house: 'H', discard: 1, chipsNow: chips, multNow: mult });
+      }
+      for (const j of st.jokers) {
+        const d = JOKER[j.id];
+        if (d.onCard) { const e = d.onCard(c, x, j); if (e) apply(e, { t: 'joker', joker: j.uid, card: c.id }); }
+      }
+    }
+    const held = t.hand.filter(c => c.s === 'S' && !played.includes(c) && !isBlotted(st, c));
+    for (const c of held) apply({ mult: has('bearer') ? 4 : 2 }, { t: 'held', card: c.id });
+    for (const j of st.jokers) {
+      const d = JOKER[j.id];
+      if (d.onHand) { const e = d.onHand(x, j); if (e) apply(e, { t: 'joker', joker: j.uid }); }
+    }
+    const total = Math.floor(chips * mult);
+    return { ev, name: HAND[ev.key].name, chips, mult, total, steps, blessed };
+  }
+
+  function play(st, ids) {
+    if (!canPlay(st, ids)) return null;
+    const t = st.table;
+    const played = ids.map(id => t.hand.find(c => c.id === id)).filter(Boolean);
+    const res = scoreHand(st, played);
+    t.hands -= 1;
+    t.score += res.total;
+    t.discards += res.blessed;
+    t.hand = t.hand.filter(c => !ids.includes(c.id));
+    st.stats.handsPlayed++;
+    if (res.total > st.stats.best) { st.stats.best = res.total; st.stats.bestHand = res.name; }
+    res.cleared = t.score >= t.target;
+    res.lost = !res.cleared && t.hands <= 0;
+    if (!res.cleared && !res.lost) res.drawn = drawUp(st);
+    if (res.lost) { st.over = true; }
+    return res;
+  }
+
+  function discard(st, ids) {
+    const t = st.table;
+    if (!t || t.discards <= 0 || !ids.length || ids.length > 5) return null;
+    t.discards -= 1;
+    t.hand = t.hand.filter(c => !ids.includes(c.id));
+    return drawUp(st);
+  }
+
+  function cashout(st) {
+    const t = st.table;
+    const lines = [{ label: `Took ${t.kind.toLowerCase()}`, amount: t.reward }];
+    if (t.hands > 0) lines.push({ label: `${t.hands} attack${t.hands > 1 ? 's' : ''} left over`, amount: t.hands });
+    const interest = Math.min(5, Math.floor(st.money / 5));
+    if (interest > 0) lines.push({ label: 'Interest, $1 per $5 held', amount: interest });
+    for (const j of st.jokers) {
+      const d = JOKER[j.id];
+      if (d.endTable) lines.push({ label: d.name, amount: d.endTable(st, j) });
+    }
+    const total = lines.reduce((a, l) => a + l.amount, 0);
+    st.money += total;
+    st.stats.tablesCleared++;
+    return { lines, total };
+  }
+
+  // advance after cashout; returns 'shop' or 'won'
+  function advance(st) {
+    st.tIdx++;
+    if (st.tIdx > 2) { st.tIdx = 0; st.ante++; }
+    if (st.ante > 2) { st.won = true; st.over = true; return 'won'; }
+    return 'shop';
+  }
+
+  function rollJoker(st, exclude) {
+    const owned = new Set([...st.jokers.map(j => j.id), ...exclude]);
+    const r = st.rnd();
+    const rarity = r < 0.7 ? 1 : r < 0.95 ? 2 : 3;
+    let pool = JOKERS.filter(j => j.rarity === rarity && !owned.has(j.id));
+    if (!pool.length) pool = JOKERS.filter(j => !owned.has(j.id));
+    if (!pool.length) return null;
+    return pool[Math.floor(st.rnd() * pool.length)].id;
+  }
+  function rollShopItems(st) {
+    const jokers = [];
+    for (let i = 0; i < 2; i++) { const id = rollJoker(st, jokers); if (id) jokers.push(id); }
+    const keys = shuffle(HANDS.map(h => h.key), st.rnd).slice(0, 2);
+    return [
+      ...jokers.map(id => ({ kind: 'joker', id, cost: JOKER[id].cost, sold: false })),
+      ...keys.map(key => ({ kind: 'study', key, cost: 3, sold: false })),
+    ];
+  }
+  function openShop(st) {
+    st.shop = { items: rollShopItems(st), reroll: 5 };
+    return st.shop;
+  }
+  function reroll(st) {
+    if (st.money < st.shop.reroll) return false;
+    st.money -= st.shop.reroll;
+    st.shop.reroll += 1;
+    st.shop.items = rollShopItems(st);
+    return true;
+  }
+  function buy(st, idx) {
+    const it = st.shop.items[idx];
+    if (!it || it.sold || st.money < it.cost) return false;
+    if (it.kind === 'joker') {
+      if (st.jokers.length >= st.maxJokers) return false;
+      st.jokers.push({ id: it.id, uid: st.uid++, n: 0 });
+    } else {
+      st.levels[it.key]++;
+    }
+    st.money -= it.cost;
+    it.sold = true;
+    return true;
+  }
+  const sellValue = j => Math.max(1, Math.floor(JOKER[j.id].cost / 2));
+  function sell(st, uid) {
+    const i = st.jokers.findIndex(j => j.uid === uid);
+    if (i < 0) return false;
+    st.money += sellValue(st.jokers[i]);
+    st.jokers.splice(i, 1);
+    return true;
+  }
+  function moveJoker(st, uid, dir) {
+    const i = st.jokers.findIndex(j => j.uid === uid);
+    const k = i + dir;
+    if (i < 0 || k < 0 || k >= st.jokers.length) return false;
+    [st.jokers[i], st.jokers[k]] = [st.jokers[k], st.jokers[i]];
+    return true;
+  }
+
+  return {
+    SUITS, RED, SUIT_ORDER, HOUSE, titleOf, HANDS, HAND, JOKERS, JOKER, BOSSES, INVITATIONALS,
+    rankLabel, cardChips, isFace, handBase, evaluate, newRun, tableInfo, startTable,
+    canPlay, play, discard, cashout, advance, openShop, reroll, buy, sell, sellValue, moveJoker, isBlotted, mulberry,
+  };
+})();
+if (typeof module !== 'undefined') module.exports = Engine; // lets tools/check.js load the rules in Node

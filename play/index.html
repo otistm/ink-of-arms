@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ink of Arms: draw cards, take castles, get trophies</title>
+<meta name="theme-color" content="#ffffff">
+<meta name="description" content="Draw cards. Take castles. Get trophies.">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ink of Arms">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,800;0,9..144,900;1,9..144,900&family=Figtree:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+
+<section id="title" class="screen on">
+  <div class="panel" style="animation:none;box-shadow:none;border:0;padding:8px 4px">
+    <h1 class="logo">Ink of Arms</h1>
+    <p class="tag">Draw cards. Take castles. Get trophies.</p>
+    <div class="events" id="invs"></div>
+    <button class="linkbtn" id="howBtn">How to play</button>
+    <div class="foot-note">Best on a phone, held upright.</div>
+    <div class="ver" id="ver"></div>
+  </div>
+</section>
+
+<section id="intro" class="screen">
+  <div class="panel" id="introPanel">
+    <div class="prog" id="pips"></div>
+    <div class="sub" id="introWhere"></div>
+    <h2 id="introKind" style="margin-top:4px"></h2>
+    <div class="big" id="introTarget" style="margin-top:14px"></div>
+    <p style="margin-top:2px">damage to breach the walls</p>
+    <div class="how" id="introBoss"></div>
+    <p id="introReward" style="font-size:13px"></p>
+    <button class="btn" id="sitBtn">Lay siege</button>
+  </div>
+</section>
+
+<section id="game" class="screen">
+  <div class="top">
+    <div>
+      <div class="hn" id="kind"></div>
+      <div class="sub" id="where"></div>
+    </div>
+    <div class="pts"><div class="pv" id="scoreNow">0</div><div class="sub" id="scoreNeed"></div></div>
+  </div>
+  <div class="bar"><i id="barFill"></i></div>
+  <p class="bossnote" id="bossNote"></p>
+  <div class="jokers" id="jokers"></div>
+  <div class="stage" id="stage">
+    <div class="played" id="played"></div>
+    <div class="readout">
+      <div class="hname" id="hname"></div>
+      <div class="cxm">
+        <div><div class="pill chips" id="chips">0</div><span class="pill-l">chips</span></div>
+        <span class="times">×</span>
+        <div><div class="pill mult" id="mult">0</div><span class="pill-l">mult</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="hand" id="hand"></div>
+  <div class="actions">
+    <button class="btn ghost" id="discardBtn">Discard<small id="discardsLeft"></small></button>
+    <button class="btn ghost" id="sortBtn" aria-label="Sort hand">Sort<small id="sortMode">rank</small></button>
+    <button class="btn" id="playBtn">Attack<small id="handsLeft"></small></button>
+  </div>
+  <div class="foot">
+    <span class="money" id="money">$4</span>
+    <span class="sub" id="deckCount"></span>
+    <button class="linkbtn" id="handsBtn">Codex</button>
+  </div>
+</section>
+
+<section id="shop" class="screen">
+  <div class="shophead"><h2>The armory</h2></div>
+  <div class="wallet"><small>Your purse</small><b id="shopMoney"></b></div>
+  <div class="label">Your relics. Tap one to move or sell it</div>
+  <div class="jokers" id="shopJokers"></div>
+  <div class="label">For sale</div>
+  <div class="shoplist" id="shelf"></div>
+  <div class="shopbtns">
+    <button class="btn ghost" id="rerollBtn">Restock</button>
+    <button class="btn" id="nextBtn">March on</button>
+  </div>
+</section>
+
+<div class="veil" id="veil"><div class="panel" id="sheet"></div></div>
+
+<!-- Order matters: each script can only use what the scripts above it define while loading. main.js is always last. -->
+<script src="js/config.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/art.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/siege.js"></script>
+<script src="js/screens.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>

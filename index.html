@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Ink of Arms: draw cards, take castles, get trophies</title>
+<meta name="description" content="A minimal ink-drawn card game. Four houses of soldiers, nine sieges, and relics that bend the rules.">
+<meta name="theme-color" content="#ffffff">
+<link rel="manifest" href="/manifest.webmanifest">
+<link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Ink of Arms">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="Ink of Arms">
+<meta property="og:title" content="Ink of Arms">
+<meta property="og:description" content="Draw cards. Take castles. Get trophies.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,900&family=Figtree:wght@600;800&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#fff;--ink:#000;--soft:#5c5c5c;--display:"Fraunces",Georgia,serif;--ui:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;color-scheme:light;box-sizing:border-box}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--paper:#fff;--ink:#000;--soft:#5c5c5c}}
+*,*::before,*::after{box-sizing:inherit}
+html,body{margin:0;min-height:100%;background:var(--paper);color:var(--ink);font-family:var(--ui)}
+canvas{position:fixed;inset:0;width:100%;height:100%;display:block;z-index:0}
+main{position:relative;z-index:1;min-height:100vh;min-height:100dvh;display:grid;place-items:end center;align-content:end;padding:24px 16px calc(env(safe-area-inset-bottom,0px) + 18px)}
+@media (min-aspect-ratio:1/1){main{place-items:center end;align-content:center;padding-right:6vw}}
+.card{width:min(420px,100%);background:var(--paper);border:2.5px solid var(--ink);border-radius:26px;box-shadow:7px 8px 0 var(--ink);padding:28px 24px 22px;text-align:center;
+  animation:in .8s cubic-bezier(.3,.7,.3,1) both .2s}
+@keyframes in{0%{opacity:0;transform:translateY(60px) scale(.8,1.2)}55%{opacity:1;transform:translateY(-8px) scale(1.04,.96)}78%{transform:translateY(2px) scale(.99,1.01)}100%{transform:none}}
+h1{font-family:var(--display);font-style:italic;font-weight:900;font-size:clamp(50px,14vw,74px);line-height:.95;margin:0;letter-spacing:-.01em}
+.tag{font-weight:800;font-size:17px;margin:12px 0 22px}
+.play{display:block;width:100%;background:var(--ink);color:var(--paper);text-decoration:none;border-radius:18px;padding:17px 20px;font-family:var(--display);font-style:italic;font-weight:900;font-size:30px;
+  border:2.5px solid var(--ink);transition:transform .22s cubic-bezier(.34,1.56,.64,1)}
+.play:hover{transform:translateY(-2px)}
+.play:active{transform:scale(1.04,.9)}
+.play:focus-visible{outline:3px solid var(--ink);outline-offset:4px}
+.feats{list-style:none;padding:0;margin:20px 0 4px;display:grid;gap:10px;text-align:left}
+.feats li{display:grid;grid-template-columns:30px 1fr;gap:10px;align-items:center;font-weight:600;font-size:14.5px;line-height:1.35}
+.feats svg{width:30px;height:30px}
+.feats b{font-weight:800}
+footer{margin-top:12px;font-size:12px;font-weight:600;color:var(--soft)}
+@media (prefers-reduced-motion:reduce){.card{animation:none}}
+</style>
+</head>
+<body>
+<canvas id="c" aria-hidden="true"></canvas>
+<main>
+  <div class="card">
+    <h1>Ink of Arms</h1>
+    <p class="tag">Draw cards. Take castles. Get trophies.</p>
+    <a class="play" href="/play/">Play</a>
+    <ul class="feats">
+      <li><svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 4 32 8.5v9c0 8-5.2 13.5-12 16-6.8-2.5-12-8-12-16v-9z" fill="#000"/></svg><span><b>Four houses.</b> Knights, Archers, Mages and Clerics, each with their own trick.</span></li>
+      <li><svg viewBox="0 0 40 40" aria-hidden="true"><g fill="none" stroke="#000" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><path d="M6 34V14l5 3V10l5 3V8l4 2 4-2v5l5-3v7l5-3v20z"/><path d="M17 34v-8a3 3 0 0 1 6 0v8"/></g></svg><span><b>Nine sieges</b> per campaign, and a lord at every citadel who changes the rules.</span></li>
+      <li><svg viewBox="0 0 40 44" aria-hidden="true"><g stroke="#000" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"><path d="M10 7H5c0 6 3 9 6.5 9.5M30 7h5c0 6-3 9-6.5 9.5" fill="none"/><path d="M10 4h20v9c0 7-4.5 11-10 11S10 20 10 13z" fill="#000"/><path d="M17 24h6v6h-6z" fill="#fff"/><path d="M11 31h18v6H11z" fill="#000"/></g></svg><span><b>Three campaigns.</b> Take all nine castles for a trophy.</span></li>
+    </ul>
+  </div>
+  <footer>Best on a phone, held upright.</footer>
+</main>
+<script>
+if('serviceWorker' in navigator&&location.protocol==='https:') navigator.serviceWorker.register('/sw.js').catch(()=>{});
+/* ---------- a hand of ink cards fanning open and closed behind the card ---------- */
+(()=>{
+  const cv=document.getElementById('c'), ctx=cv.getContext('2d');
+  const still=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const MARKS=[
+    new Path2D('M12 2.2 20.2 5.2v6.2c0 5.3-3.5 9-8.2 10.6-4.7-1.6-8.2-5.3-8.2-10.6V5.2z'),
+    new Path2D('M12 1.8 17.2 8.6h-3.4v8.2l3.4 3.6v1.8L12 19.6l-5.2 2.6v-1.8l3.4-3.6V8.6H6.8z'),
+    new Path2D('M12 1.8 14.3 9.7 22.2 12l-7.9 2.3L12 22.2l-2.3-7.9L1.8 12l7.9-2.3z'),
+    new Path2D('M5.5 2.5h13c0 5.4-2.7 8.8-5 9.7v4.6l3.8 3v1.7H6.7v-1.7l3.8-3v-4.6c-2.3-.9-5-4.3-5-9.7z')];
+  const NUM=['XIII','IX','VII','XII','IV','X','II'];
+  let W=0,H=0,D=1;
+  function resize(){ D=Math.min(2,devicePixelRatio||1); W=innerWidth; H=innerHeight; cv.width=W*D; cv.height=H*D; }
+  addEventListener('resize',resize); resize();
+  function rr(x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+  function card(i,cw,ch){
+    ctx.fillStyle='#000'; rr(-cw/2+4,-ch+5,cw,ch,cw*.14); ctx.fill();
+    ctx.fillStyle='#fff'; ctx.strokeStyle='#000'; ctx.lineWidth=2.5; rr(-cw/2,-ch,cw,ch,cw*.14); ctx.fill(); ctx.stroke();
+    ctx.fillStyle='#000'; ctx.font=`italic 900 ${cw*.24}px Fraunces, Georgia, serif`; ctx.textBaseline='top'; ctx.fillText(NUM[i],-cw/2+cw*.1,-ch+cw*.1);
+    const m=MARKS[i%4], s=cw*.46/24; ctx.save(); ctx.translate(-12*s,-ch*.5-12*s); ctx.scale(s,s);
+    if(i%4<2){ ctx.fill(m); } else { ctx.fillStyle='#fff'; ctx.fill(m); ctx.lineWidth=2/s*s*1.1; ctx.stroke(m); }
+    ctx.restore();
+  }
+  function frame(t){
+    ctx.setTransform(D,0,0,D,0,0); ctx.clearRect(0,0,W,H);
+    const land=W>H, cw=Math.min(land?H*.2:W*.24,130), ch=cw*1.4;
+    const cx=land?W*.3:W/2, cy=land?H*.72:H*.36;
+    const open=still?1:.72+.28*Math.sin(t/1400), n=NUM.length;
+    for(let i=0;i<n;i++){
+      const k=i-(n-1)/2, a=k*.17*open, bob=still?0:Math.sin(t/700+i*.9)*3;
+      ctx.save(); ctx.translate(cx,cy); ctx.rotate(a); ctx.translate(0,bob-ch*.1); card(i,cw,ch); ctx.restore();
+    }
+    if(!still) requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
