@@ -76,6 +76,12 @@ button{ appearance:none; font:inherit; color:inherit; background:none; border:0;
 .prog i.done{ background:var(--ink); }
 .prog i.now{ background:var(--ink); transform:scale(1.35); }
 .prog i.gap{ width:6px; border:0; }
+.prog i.cit{ border-radius:3px; }
+.prog i.crown{ width:20px; height:14px; border:0; border-radius:0; display:grid; place-items:center; }
+.prog i.crown svg{ width:20px; height:12px; color:var(--ink); }
+.prog i.crown.done svg path,.prog i.crown.now svg path{ fill:var(--ink); }
+.prog i.crown.now,.prog i.crown.done{ background:none; }
+.story{ font-family:var(--ui); font-weight:600; font-size:14px; line-height:1.35; color:var(--ink) !important; margin:10px 0 12px !important; }
 
 /* ---------- siege ---------- */
 #game{ gap:10px; }
@@ -87,7 +93,7 @@ button{ appearance:none; font:inherit; color:inherit; background:none; border:0;
 .pv{ font-family:var(--display); font-weight:800; font-size:30px; line-height:1; font-variant-numeric:tabular-nums; display:inline-block; transform-origin:100% 80%; }
 .bar{ position:relative; height:12px; border:2px solid var(--ink); border-radius:999px; overflow:hidden; }
 .bar i{ position:absolute; inset:0 auto 0 0; width:0; background:var(--ink); transition:width .5s var(--spring); }
-.bossnote{ margin:0; text-align:left; font-size:13px; font-weight:700; border:1.5px dashed var(--ink); border-radius:12px; padding:8px 12px; line-height:1.35; }
+.bossnote{ position:relative; margin:0; text-align:left; font-size:13px; font-weight:700; border:1.5px dashed var(--ink); border-radius:12px; padding:8px 12px; line-height:1.35; }
 
 .jokers{ display:flex; gap:7px; height:86px; flex:none; padding:0 4px 5px 0; }
 .jslot{ flex:1; min-width:0; border:2px dashed var(--ink); border-radius:12px; opacity:.3; }

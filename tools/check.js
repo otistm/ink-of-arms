@@ -39,8 +39,10 @@ function best(st) {
   let bestSet = null, bestV = -1;
   const sizes = st.table.boss && st.table.boss.mustFive ? [5] : [1,2,3,4,5];
   for (const k of sizes) for (const set of combos(st.table.hand, k)) {
+    if (E.spent(st, set)) continue;
     const e = E.evaluate(set); const b = E.handBase(e.key, st.levels[e.key]);
-    const ch = b.chips + e.scoring.filter(c => !E.isBlotted(st, c)).reduce((a, c) => a + E.cardChips(c.r), 0);
+    const g = E.guarded(st, set);
+    const ch = b.chips + e.scoring.filter(c => !E.isBlotted(st, c) && c !== g).reduce((a, c) => a + E.cardChips(c.r), 0);
     const v = ch * b.mult;
     if (v > bestV) { bestV = v; bestSet = set; }
   }
@@ -87,4 +89,24 @@ st2.table.hand = [{id:1,r:7,s:'D'},{id:2,r:7,s:'H'}]; const d0 = st2.table.disca
 r = E.play(st2, [1,2]);
 ok(Math.abs(r.mult - 2.4) < 1e-9 && st2.table.discards === d0 + 1, 'arcane+bless ' + r.mult + ' ' + st2.table.discards);
 console.log(fails ? fails + ' failures' : 'house assertions pass');
+}
+{
+// rulers face you at siege 9 of each campaign
+const at9 = inv => { const st = E.newRun(inv, 3); st.ante = 2; st.tIdx = 2; E.startTable(st); return st; };
+let st = at9(0);
+ok(st.table.boss.id === 'baron' && st.table.castle === 'Vorn Hall', 'baron at vorn hall');
+st.table.hand = [{id:1,r:2,s:'S'},{id:2,r:3,s:'H'}]; const w0 = st.table.target;
+let r = E.play(st, [1]);
+ok(r.mended > 0 && st.table.target === w0 + r.mended, 'baron mends walls ' + w0 + ' -> ' + st.table.target);
+st = at9(1);
+st.table.hand = [{id:1,r:5,s:'S'},{id:2,r:5,s:'H'},{id:3,r:9,s:'S'},{id:4,r:9,s:'H'},{id:5,r:2,s:'C'}];
+E.play(st, [1,2]);
+ok(!E.canPlay(st, [3,4]) && E.canPlay(st, [5]), 'duke: one duel per siege');
+st = at9(2);
+st.table.hand = [{id:1,r:14,s:'S'},{id:2,r:14,s:'H'}];
+r = E.play(st, [1,2]);
+ok(r.chips === 10 + 0 + 11 && r.steps.some(x => x.t === 'blot' && x.card === 1), 'king guard blots the highest card, Knights first on a tie: ' + r.chips);
+st = E.newRun(0, 4); st.tIdx = 2; E.startTable(st);
+ok(!st.table.boss.ruler, 'first citadel has a lord, not a ruler');
+console.log(fails ? fails + ' failures' : 'ruler assertions pass');
 }

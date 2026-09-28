@@ -1,6 +1,6 @@
 /* =====================================================================
    The rules. No drawing here, so it can be tested on its own (node tools/check.js).
-   Houses, titles, attacks (poker hands), relics, lords (bosses), campaigns, scoring, the armory.
+   Houses, titles, attacks (poker hands), relics, lords (bosses), rulers, campaigns, scoring, the armory.
    Never rename a relic id: they will be saved in players' runs once runs are saved.
    ===================================================================== */
 "use strict";
@@ -133,10 +133,37 @@ const Engine = (() => {
     { id: 'warden', name: 'The Warden', desc: 'No discards, and Clerics cannot restore any.', discards: 0, noBless: true },
   ];
 
+  // ---------- Rulers: the final siege of each campaign ----------
+  // Wall sizes (targetMul) are tuned so the bot falls at each ruler a little more often than at the old random lord.
+  const RULERS = [
+    { id: 'baron', name: 'Baron Vorn', ruler: true, mend: 0.1, targetMul: 1.3,
+      desc: "His masons mend the walls. They grow 10% stronger after every attack that doesn't bring them down." },
+    { id: 'duke', name: 'Duke Morcant', ruler: true, oneEach: true, targetMul: 1.4,
+      desc: 'He has read your tactics. Each kind of attack works only once in this siege. Only a Lone Rider can ride again.' },
+    { id: 'king', name: 'King Aldous', ruler: true, guard: true, targetMul: 1.1,
+      desc: 'His guard strikes down your best soldier. The highest title in every attack is blotted.' },
+  ];
+
+  // Each campaign is a war against one ruler. The third castle is the ruler's own seat.
   const INVITATIONALS = [
-    { name: 'Campaign I', mul: 1.3 },
-    { name: 'Campaign II', mul: 2.1 },
-    { name: 'Campaign III', mul: 3.3 },
+    { name: 'Campaign I', mul: 1.3, ruler: 'Baron Vorn', foe: 'the Baron', land: 'the borderlands',
+      castles: ['Thornwick', 'Ashford', 'Vorn Hall'],
+      story: ['Baron Vorn has seized the borderlands. Your march begins at Thornwick.',
+        'Thornwick is free. The road runs on to Ashford.',
+        'Only Vorn Hall is left, and the Baron waits inside.'],
+      end: 'The Baron kneels. The borderlands are free.' },
+    { name: 'Campaign II', mul: 2.1, ruler: 'Duke Morcant', foe: 'the Duke', land: 'the marsh country',
+      castles: ['Greymoor', 'Blackwater', 'Morcant Keep'],
+      story: ['Duke Morcant rules the marsh country from behind three walls. The first is Greymoor.',
+        "Greymoor is yours. Blackwater's towers rise out of the fog.",
+        'The Duke has fallen back to Morcant Keep. End it there.'],
+      end: 'The Duke hands over his seal. The marshes are yours.' },
+    { name: 'Campaign III', mul: 3.3, ruler: 'King Aldous', foe: 'the King', land: 'the realm',
+      castles: ['Stonegate', 'Ravenspire', 'Highcrown'],
+      story: ['King Aldous has called every banner in the realm. Stonegate guards the road to his capital.',
+        'Stonegate has fallen. Ravenspire is the last fortress before the crown.',
+        'Highcrown, seat of King Aldous. Take it and the realm is yours.'],
+      end: 'King Aldous lays down his crown. The realm is yours.' },
   ];
   const ANTE_BASE = [300, 800, 2000];
   const TABLE_KIND = ['The outpost', 'The keep', 'The citadel'];
@@ -160,11 +187,13 @@ const Engine = (() => {
   }
 
   function tableInfo(st) {
-    const boss = st.tIdx === 2 ? st.bosses[st.ante] : null;
+    const inv = INVITATIONALS[st.inv];
+    const boss = st.tIdx !== 2 ? null : st.ante === 2 ? RULERS[st.inv] : st.bosses[st.ante];
     let target = ANTE_BASE[st.ante] * TABLE_MUL[st.tIdx] * INVITATIONALS[st.inv].mul;
     if (boss && boss.targetMul) target *= boss.targetMul;
     return {
       kind: TABLE_KIND[st.tIdx], boss, target: niceRound(target), reward: TABLE_REWARD[st.tIdx],
+      castle: inv.castles[st.ante], tIdx: st.tIdx, ante: st.ante,
       number: st.ante * 3 + st.tIdx + 1,
     };
   }
@@ -177,7 +206,7 @@ const Engine = (() => {
       hands: b.hands != null ? b.hands : st.handsMax,
       discards: b.discards != null ? b.discards : st.discardsMax,
       handSize: st.handSize + (b.handSize || 0),
-      draw: shuffle(makeDeck(), st.rnd), hand: [],
+      draw: shuffle(makeDeck(), st.rnd), hand: [], used: [],
     };
     drawUp(st);
     return st.table;
@@ -195,10 +224,25 @@ const Engine = (() => {
     return !!(b && b.blot && b.blot(c));
   }
 
+  // King Aldous's guard: the highest title in the attack. Ties go by house order, so the pick never depends on card order.
+  function guarded(st, played) {
+    const b = st.table && st.table.boss;
+    if (!b || !b.guard || !played.length) return null;
+    return played.reduce((a, c) => (c.r > a.r || (c.r === a.r && SUIT_ORDER[c.s] < SUIT_ORDER[a.s]) ? c : a));
+  }
+  // Duke Morcant: an attack kind already used this siege. A Lone Rider is always allowed, so a hand can never get stuck.
+  function spent(st, cards) {
+    const t = st.table;
+    if (!t || !t.boss || !t.boss.oneEach || !cards.length) return false;
+    const key = evaluate(cards).key;
+    return key !== 'hc' && t.used.includes(key);
+  }
+
   function canPlay(st, ids) {
     const t = st.table;
     if (!t || t.hands <= 0 || !ids.length || ids.length > 5) return false;
     if (t.boss && t.boss.mustFive && ids.length !== 5) return false;
+    if (spent(st, ids.map(id => t.hand.find(c => c.id === id)).filter(Boolean))) return false;
     return true;
   }
 
@@ -214,6 +258,7 @@ const Engine = (() => {
     };
     const has = id => st.jokers.some(j => j.id === id);
     let blessed = 0;
+    const guard = guarded(st, played);
     const apply = (e, base) => {
       if (e.chips) chips += e.chips;
       if (e.mult) mult += e.mult;
@@ -222,7 +267,7 @@ const Engine = (() => {
       steps.push({ ...base, ...e, chipsNow: chips, multNow: mult });
     };
     for (const c of ev.scoring) {
-      if (isBlotted(st, c)) {
+      if (isBlotted(st, c) || c === guard) {
         steps.push({ t: 'blot', card: c.id, chipsNow: chips, multNow: mult });
         for (const j of st.jokers) {
           const d = JOKER[j.id];
@@ -266,8 +311,14 @@ const Engine = (() => {
     t.hand = t.hand.filter(c => !ids.includes(c.id));
     st.stats.handsPlayed++;
     if (res.total > st.stats.best) { st.stats.best = res.total; st.stats.bestHand = res.name; }
+    t.used.push(res.ev.key);
     res.cleared = t.score >= t.target;
     res.lost = !res.cleared && t.hands <= 0;
+    if (!res.cleared && !res.lost && t.boss && t.boss.mend) {
+      const was = t.target;
+      t.target = niceRound(t.target * (1 + t.boss.mend));
+      res.mended = t.target - was;
+    }
     if (!res.cleared && !res.lost) res.drawn = drawUp(st);
     if (res.lost) { st.over = true; }
     return res;
@@ -364,9 +415,9 @@ const Engine = (() => {
   }
 
   return {
-    SUITS, RED, SUIT_ORDER, HOUSE, titleOf, HANDS, HAND, JOKERS, JOKER, BOSSES, INVITATIONALS,
+    SUITS, RED, SUIT_ORDER, HOUSE, titleOf, HANDS, HAND, JOKERS, JOKER, BOSSES, RULERS, INVITATIONALS,
     rankLabel, cardChips, isFace, handBase, evaluate, newRun, tableInfo, startTable,
-    canPlay, play, discard, cashout, advance, openShop, reroll, buy, sell, sellValue, moveJoker, isBlotted, mulberry,
+    canPlay, guarded, spent, play, discard, cashout, advance, openShop, reroll, buy, sell, sellValue, moveJoker, isBlotted, mulberry,
   };
 })();
 if (typeof module !== 'undefined') module.exports = Engine; // lets tools/check.js load the rules in Node

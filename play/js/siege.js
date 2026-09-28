@@ -37,8 +37,8 @@ function renderJokers(host, onTap) {
 }
 function renderHud() {
   const t = st.table;
-  $('where').textContent = `${E.INVITATIONALS[st.inv].name}, siege ${t.number} of 9`;
-  $('kind').textContent = t.boss ? t.boss.name : t.kind;
+  $('where').textContent = `${t.boss ? t.castle + ' citadel' : t.kind}, siege ${t.number} of 9`;
+  $('kind').textContent = t.boss ? t.boss.name : t.castle;
   $('kind').classList.toggle('boss', !!t.boss);
   $('scoreNeed').classList.add('sub');
   $('bossNote').textContent = t.boss ? t.boss.desc : '';
@@ -61,13 +61,24 @@ function renderButtons() {
 function renderPreview() {
   const cards = st.table.hand.filter(c => sel.has(c.id));
   if (!cards.length) {
+    markGuarded(cards);
     $('hname').innerHTML = st.table.boss && st.table.boss.mustFive ? '<span class="note">The Drillmaster wants exactly five cards</span>' : '<span class="note">Pick up to five cards</span>';
     $('chips').textContent = '0'; $('mult').textContent = '0';
     return;
   }
   const ev = E.evaluate(cards), lv = st.levels[ev.key], b = E.handBase(ev.key, lv);
-  $('hname').innerHTML = `${E.HAND[ev.key].name}<span class="tw">lvl ${lv}</span>`;
+  $('hname').innerHTML = E.spent(st, cards)
+    ? `<span class="note">The Duke has seen your ${E.HAND[ev.key].name}. Try another attack</span>`
+    : `${E.HAND[ev.key].name}<span class="tw">lvl ${lv}</span>`;
   $('chips').textContent = fmt(b.chips); $('mult').textContent = fmtM(b.mult);
+  markGuarded(cards);
+}
+// King Aldous: show an ink blot on the picked card his guard will strike
+function markGuarded(cards) {
+  $('hand').querySelectorAll('.gblot').forEach(b => b.remove());
+  const g = E.guarded(st, cards);
+  const el = g && $('hand').querySelector(`[data-id="${g.id}"]`);
+  if (el) el.insertAdjacentHTML('beforeend', blotSvg(g.id + 3).replace('class="blot"', 'class="blot gblot"'));
 }
 function layoutFan() {
   const host = $('hand');
@@ -231,6 +242,11 @@ $('playBtn').onclick = async () => {
   splat($('scoreNow'));
   await countUp($('scoreNow'), from, to, 600);
   renderHud();
+  if (res.mended) {
+    floatText($('bossNote'), `walls mended +${fmt(res.mended)}`, false);
+    squash($('scoreNeed'));
+    await sleep(700);
+  }
   await sleep(300);
   // sweep stage
   await Promise.all([...stage.children].map((el, i) => anim(el, [{ transform: 'none', opacity: +el.style.opacity || 1 }, { transform: `translate(${220 + i * 20}px,-20px) rotate(20deg)`, opacity: 0 }], 360, 'cubic-bezier(.5,0,.8,.4)')));

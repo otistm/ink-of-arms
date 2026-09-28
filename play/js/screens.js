@@ -8,12 +8,16 @@ function renderTitle() {
   invs.innerHTML = '';
   E.INVITATIONALS.forEach((inv, i) => {
     const locked = i > 0 && !save.trophies[i - 1];
+    // only the next locked campaign is shown; the ones after it stay a surprise
+    if (i > 1 && !save.trophies[i - 2]) return;
     const won = save.trophies[i];
     const b = document.createElement('button');
     b.className = 'event' + (locked ? ' locked' : '');
     b.style.animationDelay = (i * 0.08) + 's';
-    const kicker = ['Three castles', 'Thicker walls', 'The last fortresses'][i];
-    const line = locked ? `Win ${E.INVITATIONALS[i - 1].name} to march here.` : ['Nine sieges, three lords. Take them all for the trophy.', 'Stronger walls and crueler lords.', 'The hardest sieges in the realm.'][i];
+    const kicker = `March on ${inv.ruler}`;
+    const line = locked ? `Win ${E.INVITATIONALS[i - 1].name} to march on ${inv.ruler}.`
+      : won ? inv.end
+      : `Take ${inv.castles[0]}, ${inv.castles[1]} and ${inv.castles[2]}, then bring down ${inv.foe}.`;
     b.innerHTML = `<div class="tw-wrap">${locked ? LOCK : TROPHY(won)}<small>${locked ? 'Locked' : won ? 'Won' : 'Trophy'}</small></div><div class="ev"><i>${kicker}</i><b>${inv.name}</b><span>${line}</span></div>`;
     b.onclick = () => { if (locked) { b.classList.remove('nope'); void b.offsetWidth; b.classList.add('nope'); return; } startRun(i); };
     invs.appendChild(b);
@@ -25,7 +29,8 @@ $('howBtn').onclick = () => sheet(`<h2>How to play</h2><p>Draw cards. Take castl
   <p>Attacks work like poker hands. Two of a title is a Duel, five of one house is a Banner, five titles in a row is a Chain of Command.</p>
   <p>Every attack deals chips × mult. Breach the walls before you run out of attacks.</p>
   <p>Each house has an ability. Archers volley together, Mages multiply, Clerics give back a discard, and Knights you hold back add mult.</p>
-  <p>Between sieges, buy relics and tactics in the armory. Every third siege has a lord who changes the rules.</p></div>
+  <p>Between sieges, buy relics and tactics in the armory.</p>
+  <p>Each campaign is a war on a ruler. Take three castles, beat the lords who hold them, then face the ruler in the last citadel. Lords and rulers change the rules.</p></div>
   <button class="btn" onclick="document.getElementById('veil').classList.remove('on')">Got it</button>`);
 
 function startRun(inv) {
@@ -40,11 +45,15 @@ function showIntro() {
   for (let i = 1; i <= 9; i++) {
     const p = document.createElement('i');
     if (i < info.number) p.className = 'done'; else if (i === info.number) p.className = 'now';
+    if (i % 3 === 0) p.classList.add('cit');
+    if (i === 9) { p.classList.add('crown'); p.innerHTML = CROWN; }
     pips.appendChild(p);
     if (i % 3 === 0 && i < 9) { const g = document.createElement('i'); g.className = 'gap'; pips.appendChild(g); }
   }
   $('introWhere').textContent = `${E.INVITATIONALS[st.inv].name}, siege ${info.number} of 9`;
-  $('introKind').textContent = info.boss ? info.boss.name : info.kind;
+  $('introStory').textContent = storyLine(info);
+  $('introKind').textContent = info.boss ? info.boss.name : info.castle;
+  $('introPlace').textContent = info.boss ? `${info.castle}, the citadel` : info.kind;
   $('introTarget').textContent = fmt(info.target);
   $('introBoss').textContent = info.boss ? info.boss.desc : '';
   $('introBoss').classList.toggle('hidden', !info.boss);
@@ -60,6 +69,16 @@ $('sitBtn').onclick = () => {
   renderGame(true);
 };
 
+
+// The line of story that opens each siege.
+function storyLine(info) {
+  const inv = E.INVITATIONALS[st.inv];
+  if (info.tIdx === 0) return inv.story[info.ante];
+  if (info.tIdx === 1) return `${info.castle}'s outpost has fallen. The keep still stands.`;
+  if (info.boss.ruler) return `No lords left to hide behind. ${inv.ruler} will defend ${info.castle} in person.`;
+  return `${info.boss.name} holds ${info.castle} for ${inv.foe}.`;
+}
+const capital = s => s[0].toUpperCase() + s.slice(1);
 
 // ---------- relic card and codex ----------
 function jokerSheet(j, allowSell) {
@@ -93,10 +112,13 @@ const HOUSE_WORD = { C: 'volley', D: 'arcane', H: 'blessing' };
 
 // ---------- cashout / end ----------
 function cashoutSheet() {
-  const kind = st.table.boss ? st.table.boss.name : st.table.kind;
-  const scored = st.table.score, target = st.table.target;
+  const t = st.table;
+  const fell = !t.boss ? `${t.castle}'s ${t.kind.slice(4)} has fallen.`
+    : t.boss.ruler ? `${t.boss.name} is beaten. ${t.castle} is yours.`
+    : `${t.boss.name} yields. ${t.castle} is yours.`;
+  const scored = t.score, target = t.target;
   const c = E.cashout(st);
-  sheet(`<h2>Walls breached</h2><p>${kind} has fallen.</p>
+  sheet(`<h2>Walls breached</h2><p>${fell}</p>
     <div class="big">${fmt(scored)}</div><p style="margin-top:0">damage against walls of ${fmt(target)}</p>
     <div class="board">` +
     c.lines.map((l, i) => `<div class="row" style="animation-delay:${0.25 + i * 0.08}s"><span class="nm">${l.label}</span><b>$${l.amount}</b></div>`).join('') +
@@ -114,7 +136,8 @@ function cashoutSheet() {
 function lostSheet() {
   const t = st.table;
   const inv = st.inv;
-  sheet(`<h2>The siege failed</h2><p>Out of attacks at siege ${t.number}.</p>
+  const held = t.boss ? `${t.boss.name} holds ${t.castle}.` : `${t.castle}'s ${t.kind.slice(4)} holds.`;
+  sheet(`<h2>The siege failed</h2><p>${held} Out of attacks at siege ${t.number}.</p>
     <div class="big">${fmt(t.score)}</div><p style="margin-top:0">of the ${fmt(t.target)} needed to breach</p>
     <div class="board">
       <div class="row"><span class="nm">Sieges won</span><b>${st.stats.tablesCleared}</b></div>
@@ -126,8 +149,9 @@ function lostSheet() {
 }
 function wonSheet() {
   save.trophies[st.inv] = true; writeSave(save);
-  sheet(`<h2>Trophy won</h2><p>${E.INVITATIONALS[st.inv].name} is yours.</p>
-    <div class="award"><div class="troph" id="troph">${TROPHY(true)}</div><p>All nine castles taken</p></div>
+  const inv = E.INVITATIONALS[st.inv];
+  sheet(`<h2>Trophy won</h2><p>${inv.end}</p>
+    <div class="award"><div class="troph" id="troph">${TROPHY(true)}</div><p>${capital(inv.foe)} has fallen</p></div>
     <div class="board">
       <div class="row"><span class="nm">Best attack<small>${st.stats.bestHand}</small></span><b>${fmt(st.stats.best)}</b></div>
       <div class="row" style="animation-delay:.08s"><span class="nm">Attacks made</span><b>${st.stats.handsPlayed}</b></div>

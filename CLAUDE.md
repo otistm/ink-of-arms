@@ -26,14 +26,14 @@ Otis is the designer. He doesn't read code. He judges changes by playing them on
 | main.js | Startup (always last) |
 
 ## How it plays
-- A campaign is nine sieges: three castles, each an outpost, a keep and a citadel. The citadel has a lord who changes the rules. Take all nine for the campaign's trophy; winning a campaign unlocks the next.
+- A campaign is a war on one ruler (Baron Vorn, Duke Morcant, King Aldous): nine sieges at three named castles, each an outpost, a keep and a citadel. The first two citadels have a random lord who changes the rules; the third castle is the ruler's seat and siege 9 is the ruler, with a rule of their own (`RULERS` in engine.js). A line of story opens every siege. Take all nine for the campaign's trophy; winning a campaign unlocks the next. The home screen shows only the next locked campaign, so III stays hidden until II is won.
 - Each siege: a hand of 8, up to 5 cards per attack, 4 attacks and 3 discards. Damage is chips × mult; beat the wall's strength before the attacks run out.
 - Cards: four houses (Knights solid shield, Archers solid arrow, Mages outline star, Clerics outline chalice) and thirteen titles, I Peasant to XIII King. Princes, Queens and Kings are royals and wear a crown.
 - Attacks are poker hands with new names: Lone Rider, Duel, Double Duel, Council, Chain of Command (five titles in a row, no wrap-around), Banner (five of one house), Garrison, Warband, Crusade.
 - House abilities: Archers volley (+6 chips per other Archer in the attack), Mages arcane (×1.2 mult each), Clerics bless (restore a discard, once per attack), Knights stalwart (+2 mult for each Knight held back in hand, not played).
-- Lords blot cards (blotted cards score nothing and trigger nothing), or change attacks, discards or hand size.
+- Lords blot cards (blotted cards score nothing and trigger nothing), or change attacks, discards or hand size. Rulers: the Baron mends his walls 10% after each attack that doesn't breach, the Duke allows each attack kind once (Lone Rider is always allowed, so a hand can't get stuck), the King's guard blots the highest title in each attack.
 - The armory sells relics (up to 5, they fire left to right) and tactics (level up an attack). Money: siege reward, $1 per unused attack, interest of $1 per $5 held (max $5).
-- Balance check: `node tools/check.js` has a simple bot play 60 runs of each campaign. Current win rates are roughly 60% / 33% / 5%. A strategic human should do better. Re-run it after changing numbers and tell Otis how the rates moved.
+- Balance check: `node tools/check.js` has a simple bot play 60 runs of each campaign. Current win rates are roughly 58% / 25% / 5%. Ruler walls are tuned so the bot falls at siege 9 a little more often than it did against a random lord. A strategic human should do better. Re-run it after changing numbers and tell Otis how the rates moved.
 
 ## Every change
 1. Work on a new branch, never directly on `main`.
@@ -58,7 +58,7 @@ Progress is kept in the browser's localStorage under `inkofarms-save`: `{ trophi
 
 ## Smoke test
 - The front page shows the fanning cards and a Play button; Play opens the home screen with Campaign I open and II and III locked (dashed).
-- Campaign I shows the siege intro: the nine progress dots, "The outpost" and the wall strength. Lay siege deals eight cards with a bounce.
+- Campaign I shows the siege intro: the nine progress dots (square citadels, a crown for the ruler), a line of story, "Thornwick", "The outpost" and the wall strength. Lay siege deals eight cards with a bounce.
 - Tapping cards lifts them and shows the attack name, level and chips × mult. Attack plays them out: each scoring card hops with its chips, house abilities and relics call out their bonuses, the total lands and the score counts up.
 - Discard throws the picked cards away and deals new ones.
 - Winning a siege shows "Walls breached" with the payout board; Collect opens the armory. Buying a relic adds it to the row; tapping a relic lets you move or sell it.
