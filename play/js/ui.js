@@ -12,7 +12,11 @@ let st = null, sel = new Set(), busy = false, sortMode = 'rank', speed = 1;
 const SAVE_KEY = 'inkofarms-save';
 function loadSave() { try { return JSON.parse(localStorage.getItem(SAVE_KEY)) || {}; } catch (e) { return {}; } }
 function writeSave(s) { try { localStorage.setItem(SAVE_KEY, JSON.stringify(s)); } catch (e) {} }
-let save = loadSave(); save.trophies = save.trophies || [false, false, false];
+let save = loadSave(); save.trophies = save.trophies || [false, false, false, false];
+// 0.4.0 added the Queen as Campaign III and moved the King to IV. Older saves had three trophies,
+// the third being the King's: keep it as the King's, and leave the Queen's unwon (it unlocks from the Duke's).
+if (!save.lay) { const t = save.trophies; save.trophies = [!!t[0], !!t[1], false, !!t[2]]; save.lay = 2; writeSave(save); }
+while (save.trophies.length < 4) save.trophies.push(false);
 
 const sleep = ms => new Promise(r => setTimeout(r, RM ? Math.min(ms, 40) : ms * speed));
 const fmt = n => Math.floor(n).toLocaleString('en-US');

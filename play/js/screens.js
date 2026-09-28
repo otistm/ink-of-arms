@@ -8,10 +8,11 @@ function renderTitle() {
   invs.innerHTML = '';
   const RUN = loadRun();
   E.INVITATIONALS.forEach((inv, i) => {
-    const locked = i > 0 && !save.trophies[i - 1];
-    // only the next locked campaign is shown; the ones after it stay a surprise
-    if (i > 1 && !save.trophies[i - 2]) return;
     const won = save.trophies[i];
+    // a campaign already won stays open, even if one before it was added later (the Queen)
+    const locked = i > 0 && !won && !save.trophies[i - 1];
+    // only the next locked campaign is shown; the ones after it stay a surprise
+    if (i > 1 && !won && !save.trophies[i - 2]) return;
     const b = document.createElement('button');
     b.className = 'event' + (locked ? ' locked' : '');
     b.style.animationDelay = (i * 0.08) + 's';

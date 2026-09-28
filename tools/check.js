@@ -48,8 +48,8 @@ function best(st) {
   }
   return { set: bestSet, v: bestV };
 }
-let wins = [0,0,0], runs = 60, deepest = [];
-for (const inv of [0,1,2]) for (let s = 1; s <= runs; s++) {
+let wins = [0,0,0,0], runs = 60, deepest = [];
+for (const inv of [0,1,2,3]) for (let s = 1; s <= runs; s++) {
   const st = E.newRun(inv, s * 7919);
   let guard = 0;
   while (!st.over && guard++ < 500) {
@@ -103,6 +103,11 @@ st.table.hand = [{id:1,r:5,s:'S'},{id:2,r:5,s:'H'},{id:3,r:9,s:'S'},{id:4,r:9,s:
 E.play(st, [1,2]);
 ok(!E.canPlay(st, [3,4]) && E.canPlay(st, [5]), 'duke: one duel per siege');
 st = at9(2);
+ok(st.table.boss.id === 'queen', 'queen at campaign III');
+st.table.hand = [{id:1,r:5,s:'C'},{id:2,r:5,s:'D'},{id:3,r:5,s:'S'},{id:4,r:9,s:'C'},{id:5,r:2,s:'D'},{id:6,r:3,s:'H'}];
+r = E.play(st, [1,2]);
+ok(r.closed === 'C' && E.isBlotted(st, st.table.hand.find(c => c.id === 4)) && !E.isBlotted(st, st.table.hand.find(c => c.id === 5)), 'queen shuts out the house used most, archers first on a tie');
+st = at9(3);
 st.table.hand = [{id:1,r:14,s:'S'},{id:2,r:14,s:'H'}];
 r = E.play(st, [1,2]);
 ok(r.chips === 10 + 0 + 11 && r.steps.some(x => x.t === 'blot' && x.card === 1), 'king guard blots the highest card, Knights first on a tie: ' + r.chips);
@@ -121,8 +126,10 @@ const ra = E.play(a, ids(a)), rb = E.play(b, ids(b));
 ok(ra.total === rb.total && a.table.hand.map(c => c.id).join() === b.table.hand.map(c => c.id).join(), 'same attack, same result and same draw');
 E.openShop(a); E.openShop(b);
 ok(JSON.stringify(a.shop) === JSON.stringify(b.shop), 'same armory after restore');
-const r9 = E.newRun(2, 7); r9.ante = 2; r9.tIdx = 2; E.startTable(r9);
+const r9 = E.newRun(3, 7); r9.ante = 2; r9.tIdx = 2; E.startTable(r9);
 ok(E.restore(JSON.parse(JSON.stringify(E.snapshot(r9)))).table.boss.id === 'king', 'ruler restored');
 ok(E.restore({ v: 99 }) === null, 'unknown save ignored');
+const old = JSON.parse(JSON.stringify(E.snapshot(r9))); delete old.lay; old.inv = 2;
+ok(E.restore(old).inv === 3, 'a King run saved before the Queen resumes as Campaign IV');
 console.log(fails ? fails + ' failures' : 'save assertions pass');
 }

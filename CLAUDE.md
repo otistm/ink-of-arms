@@ -26,14 +26,14 @@ Otis is the designer. He doesn't read code. He judges changes by playing them on
 | main.js | Startup (always last) |
 
 ## How it plays
-- A campaign is a war on one ruler (Baron Vorn, Duke Morcant, King Aldous): nine sieges at three named castles, each an outpost, a keep and a citadel. The first two citadels have a random lord who changes the rules; the third castle is the ruler's seat and siege 9 is the ruler, with a rule of their own (`RULERS` in engine.js). A line of story opens every siege. Take all nine for the campaign's trophy; winning a campaign unlocks the next. The home screen shows only the next locked campaign, so III stays hidden until II is won.
+- A campaign is a war on one ruler (Baron Vorn, Duke Morcant, Queen Maelis, King Aldous): nine sieges at three named castles, each an outpost, a keep and a citadel. The first two citadels have a random lord who changes the rules; the third castle is the ruler's seat and siege 9 is the ruler, with a rule of their own (`RULERS` in engine.js). A line of story opens every siege. Take all nine for the campaign's trophy; winning a campaign unlocks the next. The home screen shows only the next locked campaign, so III and IV stay hidden until the one two before them is won.
 - Each siege: a hand of 8, up to 5 cards per attack, 4 attacks and 3 discards. Damage is chips × mult; beat the wall's strength before the attacks run out.
 - Cards: four houses (Knights solid shield, Archers solid arrow, Mages outline star, Clerics outline chalice) and thirteen titles, I Peasant to XIII King. Princes, Queens and Kings are royals and wear a crown.
 - Attacks are poker hands with new names: Lone Rider, Duel, Double Duel, Council, Chain of Command (five titles in a row, no wrap-around), Banner (five of one house), Garrison, Warband, Crusade.
 - House abilities: Archers volley (+6 chips per other Archer in the attack), Mages arcane (×1.2 mult each), Clerics bless (restore a discard, once per attack), Knights stalwart (+2 mult for each Knight held back in hand, not played).
-- Lords blot cards (blotted cards score nothing and trigger nothing), or change attacks, discards or hand size. Rulers: the Baron mends his walls 10% after each attack that doesn't breach, the Duke allows each attack kind once (Lone Rider is always allowed, so a hand can't get stuck), the King's guard blots the highest title in each attack.
+- Lords blot cards (blotted cards score nothing and trigger nothing), or change attacks, discards or hand size. Rulers: the Baron mends his walls 10% after each attack that doesn't breach, the Duke allows each attack kind once (Lone Rider is always allowed, so a hand can't get stuck), the Queen blots the house you used most after each attack, the King's guard blots the highest title in each attack.
 - The armory sells relics (up to 5, they fire left to right) and tactics (level up an attack). Money: siege reward, $1 per unused attack, interest of $1 per $5 held (max $5).
-- Balance check: `node tools/check.js` has a simple bot play 60 runs of each campaign. Current win rates are roughly 58% / 25% / 5%. Ruler walls are tuned so the bot falls at siege 9 a little more often than it did against a random lord. A strategic human should do better. Re-run it after changing numbers and tell Otis how the rates moved.
+- Balance check: `node tools/check.js` has a simple bot play 60 runs of each campaign. Current win rates are roughly 58% / 25% / 13% / 5%. Ruler walls are tuned so the bot falls at siege 9 a little more often than it did against a random lord. A strategic human should do better. Re-run it after changing numbers and tell Otis how the rates moved.
 
 ## Every change
 1. Work on a new branch, never directly on `main`.
@@ -42,7 +42,8 @@ Otis is the designer. He doesn't read code. He judges changes by playing them on
 4. Test locally: run `python -m http.server` in the repo folder and open http://localhost:8000/play/ at a phone size (390 × 844). Also check a tall, wide screen (a foldable, about 640 × 860): the hand of cards must never touch the buttons.
 
 ## Protect players' saved progress
-Progress is kept in the browser's localStorage under `inkofarms-save`: `{ trophies: [bool, bool, bool] }`.
+Progress is kept in the browser's localStorage under `inkofarms-save`: `{ trophies: [bool, bool, bool, bool], lay: 2 }`, one trophy per campaign by position.
+- 0.4.0 inserted the Queen as Campaign III; `ui.js` converts saves without `lay` (the old third trophy was the King's). Add new campaigns at the end from now on, or write another conversion.
 - Never rename that key or remove a field. Add new fields with defaults.
 - Never rename a relic `id`, house key or attack `key`, or a lord or ruler `id`; saved runs store them.
 - The run in progress (pause and resume, copied from Ink Nine) is saved under `inkofarms-run` by `saveRun` in screens.js, using `Engine.snapshot` / `Engine.restore`. The snapshot has `v:1`; if you change the shape of the run, bump `v` and make `restore()` ignore or convert older snapshots.

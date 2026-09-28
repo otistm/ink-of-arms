@@ -246,6 +246,11 @@ $('playBtn').onclick = async () => {
   splat($('scoreNow'));
   await countUp($('scoreNow'), from, to, 600);
   renderHud();
+  if (res.closed) {
+    floatText($('bossNote'), `${E.HOUSE[res.closed].name} shut out`, true);
+    squash($('bossNote'));
+    await sleep(700);
+  }
   if (res.mended) {
     floatText($('bossNote'), `walls mended +${fmt(res.mended)}`, false);
     squash($('scoreNeed'));

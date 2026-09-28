@@ -148,11 +148,15 @@ const Engine = (() => {
       desc: "His masons mend the walls. They grow 10% stronger after every attack that doesn't bring them down." },
     { id: 'duke', name: 'Duke Morcant', ruler: true, oneEach: true, targetMul: 1.4,
       desc: 'He has read your tactics. Each kind of attack works only once in this siege. Only a Lone Rider can ride again.' },
+    { id: 'queen', name: 'Queen Maelis', ruler: true, court: true, targetMul: 1,
+      desc: 'She closes her court to you. After each attack, the house you used most is blotted for the rest of the siege.' },
     { id: 'king', name: 'King Aldous', ruler: true, guard: true, targetMul: 1.1,
       desc: 'His guard strikes down your best soldier. The highest title in every attack is blotted.' },
   ];
 
   // Each campaign is a war against one ruler. The third castle is the ruler's own seat.
+  // Campaigns are kept in players' saves by position. The Queen was added as III in 0.4.0, which moved the King to IV;
+  // ui.js converts older saves. Add new campaigns at the end from now on.
   const INVITATIONALS = [
     { name: 'Campaign I', mul: 1.3, ruler: 'Baron Vorn', foe: 'the Baron', land: 'the borderlands',
       castles: ['Thornwick', 'Ashford', 'Vorn Hall'],
@@ -166,9 +170,15 @@ const Engine = (() => {
         "Greymoor is yours. Blackwater's towers rise out of the fog.",
         'The Duke has fallen back to Morcant Keep. End it there.'],
       end: 'The Duke hands over his seal. The marshes are yours.' },
-    { name: 'Campaign III', mul: 3.3, ruler: 'King Aldous', foe: 'the King', land: 'the realm',
+    { name: 'Campaign III', mul: 2.7, ruler: 'Queen Maelis', foe: 'the Queen', land: 'the river kingdom',
+      castles: ['Rosewater', 'Saltmere', 'Glasswater'],
+      story: ['Queen Maelis rules the river kingdom, and her spies are everywhere. The march begins at Rosewater.',
+        'Rosewater is taken. Saltmere guards the mouth of the river.',
+        'Glasswater, where the Queen holds court behind walls of glass. Her doors are closed to you.'],
+      end: 'Queen Maelis gives up her court. The river kingdom is yours.' },
+    { name: 'Campaign IV', mul: 3.3, ruler: 'King Aldous', foe: 'the King', land: 'the realm',
       castles: ['Stonegate', 'Ravenspire', 'Highcrown'],
-      story: ['King Aldous has called every banner in the realm. Stonegate guards the road to his capital.',
+      story: ['With the Queen fallen, King Aldous has called every banner in the realm. Stonegate guards the road to his capital.',
         'Stonegate has fallen. Ravenspire is the last fortress before the crown.',
         'Highcrown, seat of King Aldous. Take it and the realm is yours.'],
       end: 'King Aldous lays down his crown. The realm is yours.' },
@@ -214,7 +224,7 @@ const Engine = (() => {
       hands: b.hands != null ? b.hands : st.handsMax,
       discards: b.discards != null ? b.discards : st.discardsMax,
       handSize: st.handSize + (b.handSize || 0),
-      draw: shuffle(makeDeck(), st.rnd), hand: [], used: [],
+      draw: shuffle(makeDeck(), st.rnd), hand: [], used: [], closed: [],
     };
     drawUp(st);
     return st.table;
@@ -228,7 +238,8 @@ const Engine = (() => {
   }
 
   function isBlotted(st, c) {
-    const b = st.table && st.table.boss;
+    const t = st.table, b = t && t.boss;
+    if (b && b.court && t.closed && t.closed.includes(c.s)) return true;
     return !!(b && b.blot && b.blot(c));
   }
 
@@ -322,6 +333,13 @@ const Engine = (() => {
     t.used.push(res.ev.key);
     res.cleared = t.score >= t.target;
     res.lost = !res.cleared && t.hands <= 0;
+    if (!res.cleared && !res.lost && t.boss && t.boss.court) {
+      // Queen Maelis closes her court to the house you used most (ties go by house order)
+      const count = {};
+      res.ev.scoring.forEach(c => { if (!t.closed.includes(c.s)) count[c.s] = (count[c.s] || 0) + 1; });
+      const house = Object.keys(count).sort((a, b) => count[b] - count[a] || SUIT_ORDER[a] - SUIT_ORDER[b])[0];
+      if (house) { t.closed.push(house); res.closed = house; }
+    }
     if (!res.cleared && !res.lost && t.boss && t.boss.mend) {
       const was = t.target;
       t.target = niceRound(t.target * (1 + t.boss.mend));
@@ -427,13 +445,16 @@ const Engine = (() => {
   // If the shape changes, bump v and make restore() ignore or convert older snapshots.
   function snapshot(st) {
     const { rnd, bosses, table, ...rest } = st;
-    return { v: 1, ...JSON.parse(JSON.stringify(rest)), rn: rnd.n, bosses: bosses.map(b => b.id),
+    return { v: 1, lay: 2, ...JSON.parse(JSON.stringify(rest)), rn: rnd.n, bosses: bosses.map(b => b.id),
       table: table && JSON.parse(JSON.stringify({ ...table, boss: table.boss ? table.boss.id : null })) };
   }
   function restore(s) {
-    if (!s || s.v !== 1 || !INVITATIONALS[s.inv]) return null;
+    if (!s || s.v !== 1) return null;
+    // runs saved before the Queen was added have no lay: their Campaign III was the King's, now IV
+    if (!s.lay && s.inv === 2) s = { ...s, inv: 3 };
+    if (!INVITATIONALS[s.inv]) return null;
     const byId = id => BOSSES.find(b => b.id === id) || RULERS.find(b => b.id === id);
-    const { v, rn, bosses, table, phase, at, ...rest } = s;
+    const { v, lay, rn, bosses, table, phase, at, ...rest } = s;
     const st = { ...rest, rnd: seeded(s.seed, rn), bosses: bosses.map(byId) };
     st.table = table && { ...table, boss: table.boss ? byId(table.boss) : null };
     if (st.bosses.some(b => !b) || (table && table.boss && !st.table.boss)) return null;

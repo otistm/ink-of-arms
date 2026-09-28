@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.4.0
+- A new campaign against Queen Maelis, at Rosewater, Saltmere and Glasswater. It's now Campaign III, and the King's campaign becomes Campaign IV, the finale.
+- The Queen closes her court to you: after each attack, the house you used most is blotted for the rest of the siege.
+- If you'd already beaten the King, you keep that trophy, and the Queen's campaign is open to you.
+
 ## 0.3.0
 - New pause button in the corner above your hand, the same as Ink Nine's. It opens a card to keep playing, or save and go to the home screen.
 - Your march is saved as you play. Your campaign's card on the home screen shows where you stopped; tap it to carry on, or start that campaign over.
